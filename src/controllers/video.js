@@ -4,24 +4,22 @@ const fs= require("node:fs/promises");
 const crypto=  require("node:crypto");
 const {pipeline}= require("node:stream/promises");
 const util = require("../../lib/util");
-
 const DB = require("../DB")
+const FF= require("../../lib/FF");
 
 
 
 
 
 
+
+//Return the list fo all the videos
 
 const getVideos =(req,res,handleErr)=>{
-    const name = req.params.get("name");
-    if(name){
-        res.json({message:`Your name is ${name}`});
-
-    }else{
-        return handleErr({status:400 ,message:"Please specify a name."});
-    }
-    
+   const videos =DB.video.filter((videos)=>{
+return videos.userId===req.userId;
+   })
+    res.status(200).json(videos);
 }
 const uploadVideo= async (req,res,handleErr)=>{
     const specifiedFilename = req.headers.filename;
@@ -32,7 +30,13 @@ const uploadVideo= async (req,res,handleErr)=>{
     const extension = path.extname(specifiedFilename).substring(1).toLowerCase();
     const name = path.parse(specifiedFilename).name;
     const videoId= crypto.randomBytes(4).toString("hex");
-
+ const FORMATS_SUPPORTED = ["mp4", "mkv", "avi", "mov", "flv", "wmv"];
+ if(FORMATS_SUPPORTED.indexOf(extension)==-1){
+    return handleErr({
+        status:400,
+        message:"File format is not supported"
+    })
+ }
     try{
    //we are grabbing the video id then make folder with same name
     await fs.mkdir(`./storage/${videoId}`);
@@ -43,9 +47,18 @@ const uploadVideo= async (req,res,handleErr)=>{
     const file = await fs.open(fullPath,"w");
     //now we want to write in file so we have to create a write stream
     const fileStream = file.createWriteStream();
+     
+    const thumbnailPath = `./storage/${videoId}/thumbnail.jpg`;
     await pipeline(req,fileStream);
+     
 
- 
+    //Make a thumbnail for the video file
+  await FF.makeThumbnail(fullPath,thumbnailPath);
+
+
+   //Get the dimenstions
+ const dimensions= await FF.getDimenstions(fullPath);
+
 
     //updating our db
     DB.update();
@@ -54,6 +67,7 @@ const uploadVideo= async (req,res,handleErr)=>{
         videoId,
         name,
         extension,
+        dimensions,
         userId:req.userId,
         extractedAudio:false,
         resizes:{}
