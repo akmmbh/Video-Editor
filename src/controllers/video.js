@@ -104,9 +104,71 @@ if(e.code!=="ECONNRESET")return handleErr(e);
     console.log(specifiedFilename, extension, name);
   
 }
+const getVideoAsset= async(req,res,handleErr)=>{
+const videoId = req.params.get("videoId");
+const type = req.params.get("type");
 
+DB.update();
+const video =DB.video.find((videos)=> videos.videoId ===videoId);
+if(!video){
+    return handleErr({
+        status:404,
+        message:"video not found"
+    })
+}
+
+let file;
+let mimeType;
+let filename;
+switch(type){
+    case "thumbnail":
+        file = await fs.open(`./storage/${videoId}/thumbnail.jpg`,"r");
+        mimeType = `image/jpeg`;
+        break;
+    //audio
+    case "audio":
+        file = await fs.open(`./storage/${videoId}/audio.aac`,"r");
+        mimeType="audio/aac";
+        filename= `${video.name}-audio.aac`;
+        break;
+
+    //resize
+    case "resize":
+        const dimensions=req.prams.get("dimensions");
+        file= await fs.open(`./storage/${videoId}/${dimensions}.${video.extension}`,"r");
+        mimeType=`video/mp4`;
+        filename=`${video.name}-${dimensions}.${video.extension}`;
+        break;
+    //original
+    case "original":
+    file= await fs.open(`./storage/${videoId}/original.${video.extension}`,"r");
+    mimeType="video/mp4";
+    filename=`${video.name}.${video.externsion}`;
+    break;
+
+}
+
+    
+    //grab the file size;
+    const stat= await file.stat();
+    const fileStream= file.createReadStream();
+if(type!=="thumbnail"){
+    //Set a header to promt for download
+    res.setHeader("Content-Disposition",`attachment; filename=${filename}`)
+}
+    //set the content type header based on the file type 
+    res.setHeader("Content-Type",mimeType);
+    //set the content length to the size of the file 
+    res.setHeader("Content-Length",stat.size);
+
+    res.status(200);
+    await pipeline(fileStream,res);
+    file.close();
+
+}
 const controllers={
     getVideos,
     uploadVideo,
+    getVideoAsset,
 };
 module.exports =controllers;
