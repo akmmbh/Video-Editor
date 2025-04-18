@@ -104,6 +104,33 @@ if(e.code!=="ECONNRESET")return handleErr(e);
     console.log(specifiedFilename, extension, name);
   
 }
+//Extract the audio for the vidoe file which can only be done once per video
+const extractAudio= async(req,res,handleErr)=>{
+    try{
+    const videoId= req.params.get("videoId");
+
+    DB.update();
+    const video=DB.video.find((videos)=>videos.videoId===videoId)
+    if(video.extractedAudio){
+        return handleErr({
+            status:400,
+            message:"the audio has already been extracted for this video"
+        });
+    }
+    const originalVideoPath=`./storage/${videoId}/original.${video.extension}`;
+    const targetAudioPath=`./storage/${videoId}/audio.aac`;
+    await FF.extractAudio(originalVideoPath,targetAudioPath);
+    video.extratedAudio=true;
+    DB.save();
+    res.status(200).json({
+        status:"success",
+        message:"the Audion was extracted successfully"
+    });
+}catch(e){
+util.deleteFile(targetAudioPath);
+return handleErr(e);
+}
+}
 const getVideoAsset= async(req,res,handleErr)=>{
 const videoId = req.params.get("videoId");
 const type = req.params.get("type");
@@ -170,5 +197,6 @@ const controllers={
     getVideos,
     uploadVideo,
     getVideoAsset,
+    extractAudio,
 };
 module.exports =controllers;
