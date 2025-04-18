@@ -131,6 +131,39 @@ util.deleteFile(targetAudioPath);
 return handleErr(e);
 }
 }
+
+
+const resizeVideo = async(req,res,handleErr)=>{
+    const videoId=req.body.videoId;
+    const width = Number(req.body.width);
+    const height = Number(req.body.height);
+    DB.update();
+    const video= DB.video.find((videos)=>videos.videoId ===videoId);
+   const originalVideoPath =`./storage/${video.videoId}/original.${video.extension}`;
+const targetVideoPath=`./storage/${video.videoId}/${width}x${height}.${video.extension}`;
+ try{
+     video.resizes[`${width}x${height}`]={processing:true};
+
+
+await FF.resizeVideo(
+    originalVideoPath,
+    targetVideoPath,
+    width,
+    height,
+)
+video.resizes[`${width}x${height}`].processing=false;
+DB.save();
+
+     res.status(200).json({
+        status:"success",
+        message:"the video is now beign processed"
+     })
+    }catch(e){
+        util.deleteFile(targetVideoPath);
+  return handleErr(e);
+    }
+}
+
 const getVideoAsset= async(req,res,handleErr)=>{
 const videoId = req.params.get("videoId");
 const type = req.params.get("type");
@@ -198,5 +231,6 @@ const controllers={
     uploadVideo,
     getVideoAsset,
     extractAudio,
+    resizeVideo,
 };
 module.exports =controllers;
